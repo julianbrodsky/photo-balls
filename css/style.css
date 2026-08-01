@@ -1,0 +1,426 @@
+/* Photo Balls. A colour scheme with no self-control, held together by one
+   rule: the page is dark and saturated so that whatever ten photos turn up,
+   they are the brightest thing on the screen. */
+
+:root {
+  --plum: #2b0b53;
+  --plum-deep: #1a0536;
+  --cream: #fff3e2;
+  --candy: #ff7ab8;
+  --lemon: #ffd93d;
+  --mint: #2fd6a5;
+  --sky: #31c6f0;
+  --grape: #a978ff;
+  --alarm: #ff527a;
+  --muted: rgba(255, 243, 226, 0.62);
+  --faint: rgba(255, 243, 226, 0.34);
+  --font: ui-rounded, "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --pad-top: env(safe-area-inset-top, 0px);
+  --pad-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: var(--font);
+  color: var(--cream);
+  background:
+    radial-gradient(circle at 16% 10%, rgba(255, 122, 184, 0.34), transparent 44%),
+    radial-gradient(circle at 86% 6%, rgba(49, 198, 240, 0.26), transparent 40%),
+    radial-gradient(circle at 50% 104%, rgba(169, 120, 255, 0.38), transparent 58%),
+    var(--plum);
+  background-attachment: fixed;
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Polka dots, sitting behind everything and going nowhere. Static on purpose:
+   an animated backdrop underneath a canvas running at sixty frames a second is
+   a repaint nobody asked for. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -20%;
+  z-index: -1;
+  background-image: radial-gradient(rgba(255, 243, 226, 0.07) 2.5px, transparent 2.6px);
+  background-size: 46px 46px;
+  pointer-events: none;
+}
+
+h1, h2 { font-weight: 800; letter-spacing: -0.01em; line-height: 1.1; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+button {
+  font: inherit;
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--plum-deep);
+  padding: 0.85rem 1.6rem;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  background: linear-gradient(160deg, var(--lemon), var(--candy));
+  box-shadow: 0 5px 0 rgba(26, 5, 54, 0.55);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
+}
+
+button:hover { filter: brightness(1.06); }
+
+button:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 rgba(26, 5, 54, 0.55);
+}
+
+button.ghost {
+  color: var(--cream);
+  background: rgba(255, 243, 226, 0.08);
+  border: 2px solid rgba(255, 243, 226, 0.28);
+  box-shadow: none;
+}
+
+button.ghost:active { transform: translateY(2px); }
+
+:focus-visible {
+  outline: 3px solid var(--sky);
+  outline-offset: 3px;
+}
+
+/* ── Setup screen ────────────────────────────────────────────────────────── */
+
+#setup {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: calc(var(--pad-top) + 6vh) 1.25rem calc(var(--pad-bottom) + 3rem);
+}
+
+.intro { max-width: 34rem; text-align: center; display: grid; gap: 0.7rem; }
+
+h1 {
+  font-size: clamp(2.6rem, 12vw, 4.2rem);
+  background: linear-gradient(100deg, var(--lemon), var(--candy) 45%, var(--sky));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 0 rgba(26, 5, 54, 0.45));
+}
+
+h2 { font-size: 1.35rem; }
+
+.tagline { color: var(--muted); line-height: 1.55; }
+.fine-print { color: var(--faint); font-size: 0.82rem; }
+
+#file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+#dropzone {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: center;
+  width: 100%;
+  max-width: 32rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  border: 3px dashed rgba(255, 243, 226, 0.3);
+  border-radius: 28px;
+  background: rgba(255, 243, 226, 0.04);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+#dropzone:hover,
+#dropzone.dragover,
+#file-input:focus-visible + #dropzone {
+  border-color: var(--candy);
+  background: rgba(255, 122, 184, 0.12);
+  transform: translateY(-2px);
+}
+
+#dropzone strong { font-size: 1.2rem; color: var(--lemon); }
+
+#status {
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+  text-align: center;
+  line-height: 1.5;
+  min-height: 1.5em;
+  color: var(--alarm);
+}
+
+#status[data-tone='working'] { color: var(--mint); }
+
+#ladder-panel {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+  width: 100%;
+  max-width: 40rem;
+  text-align: center;
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: center; }
+
+.rules {
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+  max-width: 30rem;
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.rules li { padding-left: 1.4rem; position: relative; }
+
+.rules li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.42em;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--candy);
+}
+
+.rules li:nth-child(2)::before { background: var(--lemon); }
+.rules li:nth-child(3)::before { background: var(--mint); }
+.rules li:nth-child(4)::before { background: var(--sky); }
+
+.noscript { color: var(--alarm); }
+
+/* ── The running order ───────────────────────────────────────────────────── */
+
+#ladder {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.6rem;
+  width: 100%;
+  touch-action: none;   /* dragging a tile must not scroll the page under it */
+}
+
+.tile {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.2rem 0.6rem;
+  border-radius: 20px;
+  background: rgba(255, 243, 226, 0.06);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.15s, transform 0.12s;
+}
+
+.tile.dragging {
+  cursor: grabbing;
+  z-index: 2;
+  position: relative;
+  background: rgba(255, 243, 226, 0.16);
+  transform: scale(1.06);
+  box-shadow: 0 12px 26px rgba(10, 2, 24, 0.5);
+}
+
+.tile-photo {
+  width: 100%;
+  max-width: 74px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid var(--tier);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.tile-photo canvas { display: block; width: 100%; height: 100%; }
+
+.tile-value { font-weight: 800; font-size: 0.95rem; color: var(--tier); }
+
+.tile-name {
+  font-size: 0.62rem;
+  color: var(--faint);
+  text-align: center;
+  line-height: 1.15;
+}
+
+/* ── Game screen ─────────────────────────────────────────────────────────── */
+
+#game {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--pad-top) + 0.5rem) 0.6rem calc(var(--pad-bottom) + 0.4rem);
+  gap: 0.4rem;
+}
+
+#hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex: 0 0 auto;
+}
+
+.readout { display: grid; line-height: 1.05; }
+.readout.end { text-align: right; }
+
+.readout-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.readout strong { font-size: 1.7rem; font-weight: 800; }
+.readout.end strong { font-size: 1.1rem; color: var(--muted); }
+
+#score { display: inline-block; color: var(--lemon); }
+
+#score.bumped { animation: bump 0.32s cubic-bezier(0.3, 1.6, 0.5, 1); }
+
+@keyframes bump {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+
+.hud-buttons { display: flex; gap: 0.4rem; }
+
+.icon-btn {
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  font-size: 1.05rem;
+  color: var(--cream);
+  background: rgba(255, 243, 226, 0.1);
+  border: 2px solid rgba(255, 243, 226, 0.22);
+  box-shadow: none;
+}
+
+.icon-btn:active { transform: translateY(2px); }
+
+#board {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: block;
+  touch-action: none;
+  cursor: pointer;
+}
+
+/* ── The ladder rail ─────────────────────────────────────────────────────── */
+
+#rail {
+  list-style: none;
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: clamp(2px, 1.2vw, 10px);
+  padding-top: 0.15rem;
+}
+
+.rail-item {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  transition: opacity 0.3s, filter 0.3s;
+}
+
+.rail-photo {
+  display: block;
+  width: clamp(20px, 6.4vw, 34px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid var(--tier);
+  overflow: hidden;
+}
+
+.rail-photo canvas { display: block; width: 100%; height: 100%; }
+
+.rail-value {
+  font-size: clamp(0.5rem, 2vw, 0.68rem);
+  font-weight: 800;
+  color: var(--tier);
+}
+
+.rail-item.locked { opacity: 0.28; filter: grayscale(1); }
+
+/* ── Game over ───────────────────────────────────────────────────────────── */
+
+#gameover {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(15, 3, 32, 0.78);
+  animation: fade 0.35s ease;
+}
+
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+#gameover .card {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+  width: 100%;
+  max-width: 24rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  border-radius: 32px;
+  background: linear-gradient(165deg, rgba(88, 26, 128, 0.96), rgba(26, 5, 54, 0.96));
+  border: 3px solid rgba(255, 243, 226, 0.16);
+  box-shadow: 0 24px 60px rgba(6, 1, 16, 0.6);
+}
+
+.final-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.final-score {
+  font-size: 3.4rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--lemon);
+}
+
+#final-note { color: var(--muted); line-height: 1.5; }
+
+#gameover .actions { margin-top: 0.5rem; }
+
+/* ── Small screens ───────────────────────────────────────────────────────── */
+
+@media (max-width: 520px) {
+  #setup { padding-top: calc(var(--pad-top) + 3vh); gap: 1.1rem; }
+  #dropzone { padding: 1.4rem 1rem; border-radius: 22px; }
+  .actions button { flex: 1 1 9rem; }
+  .tile { padding: 0.35rem 0.1rem 0.45rem; border-radius: 14px; }
+  .tile-name { font-size: 0.55rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
