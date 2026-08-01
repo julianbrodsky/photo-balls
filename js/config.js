@@ -3,10 +3,16 @@
 // preview, and all the copy that mentions a count, so adding an eleventh tier
 // here is the only edit it would take.
 
-// Radii in board units, growing about 19% a step. The largest ball is a little
-// over a third of the box's width, which is wide enough to feel like an event
-// when one appears and narrow enough that two can still sit side by side.
-const RADII = [15, 18, 22, 27, 33, 40, 48, 57, 67, 78];
+// Radii in board units, growing about 20% a step. The whole ladder is sized
+// off its top rung. Four Disco Balls are the entire playing field: two on the
+// floor and two nestled on top of them come to rest just under the line, and a
+// fifth ends the round. That ratio is what sets the pace. An earlier build had
+// the top ball at about a third of the box's width, which left room for ten of
+// them and made reaching a losing position take a hundred drops.
+//
+// Half the box width is too big, incidentally: two of those cannot sit side by
+// side with the floor curving them together, so the pile becomes a column.
+const RADII = [19, 22, 27, 32, 39, 46, 55, 67, 80, 96];
 
 // Bright, slightly ridiculous, and ordered so neighbouring tiers never share a
 // hue. Each colour is the ring drawn around its photo, so it has to read at
@@ -46,16 +52,17 @@ export const POP_VALUE = TIERS[TOP_TIER].value * 2;
 // ── The box ────────────────────────────────────────────────────────────────
 // Board units, y pointing down, x measured from the centre line. The interior
 // runs from y = 0 at the open top to the floor curve at the bottom.
-// The box is noticeably taller than it is wide. That is not a look, it is the
-// shape of a phone: a squarer box leaves dead space above and below on the
-// screen most people will play this on, and a taller one gives a rescue drop
-// somewhere to land.
+// The box is taller than it is wide for two reasons. One is the shape of a
+// phone: a squarer box would leave dead screen above and below it. The other
+// is that the part of the box that counts, from the line down to the floor, is
+// only 440 units deep, which is four Disco Balls. Everything above the line is
+// airspace to aim and drop through.
 export const BOARD = {
   halfWidth: 220,
-  floorY: 760,      // the floor's lowest point, on the centre line
+  floorY: 690,      // the floor's lowest point, on the centre line
   sag: 56,          // how much higher the floor sits where it meets a wall
-  lineY: 112,       // rest above this line too long and the round is over
-  spawnY: 54,       // where the ready ball hovers before it drops
+  lineY: 250,       // rest above this line too long and the round is over
+  spawnY: 110,      // where the ready ball hovers before it drops
   wallThickness: 14,
   rimThickness: 18,
 };
