@@ -12,7 +12,7 @@
 //
 // Half the box width is too big, incidentally: two of those cannot sit side by
 // side with the floor curving them together, so the pile becomes a column.
-const RADII = [19, 22, 27, 32, 39, 46, 55, 67, 80, 96];
+const RADII = [34, 38, 43, 49, 55, 62, 70, 79, 89, 100];
 
 // Bright, slightly ridiculous, and ordered so neighbouring tiers never share a
 // hue. Each colour is the ring drawn around its photo, so it has to read at
@@ -61,7 +61,7 @@ export const BOARD = {
   halfWidth: 220,
   floorY: 690,      // the floor's lowest point, on the centre line
   sag: 56,          // how much higher the floor sits where it meets a wall
-  lineY: 250,       // rest above this line too long and the round is over
+  lineY: 235,       // rest above this line too long and the round is over
   spawnY: 110,      // where the ready ball hovers before it drops
   wallThickness: 14,
   rimThickness: 18,

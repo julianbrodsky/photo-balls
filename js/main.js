@@ -31,7 +31,13 @@ const audio = createAudio();
 let best = loadBest();
 dom.best.textContent = String(best);
 
+// A browser will not let a page make noise until someone has touched it, so the
+// audio context is built on the first press anywhere and not a moment sooner.
+// Capture phase, because the canvas calls preventDefault on its own pointers.
+window.addEventListener('pointerdown', () => audio.unlock(), { once: true, capture: true });
+
 dom.sound.addEventListener('click', () => {
+  audio.unlock();
   audio.setMuted(!audio.muted);
   dom.sound.textContent = audio.muted ? '🔇' : '🔊';
   dom.sound.setAttribute('aria-label', audio.muted ? 'Sound off' : 'Sound on');
