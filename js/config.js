@@ -120,8 +120,32 @@ export const RULES = {
 export const UPLOAD = {
   requiredCount: TIERS.length,
   maxFileBytes: 20 * 1024 * 1024,
-  acceptedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'],
+  // Raw files are simply larger. A ProRAW frame off a phone runs to 25 MB and
+  // a full frame camera can pass 60, so holding them to the same cap as a JPEG
+  // would reject nearly every one of them.
+  maxRawBytes: 100 * 1024 * 1024,
+  acceptedTypes: [
+    'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+    'image/x-adobe-dng', 'image/dng', 'image/tiff',
+  ],
+  // Browsers cannot agree on what a .dng is. Chrome usually reports an empty
+  // type, macOS says image/x-adobe-dng, and some report image/tiff. The
+  // extension is the only thing every one of them gets right, so it is allowed
+  // to vouch for a file on its own.
+  acceptedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'dng'],
+  rawExtensions: ['dng'],
 };
+
+export function extensionOf(name) {
+  const dot = name.lastIndexOf('.');
+  return dot === -1 ? '' : name.slice(dot + 1).toLowerCase();
+}
+
+export function isRaw(file) {
+  return UPLOAD.rawExtensions.includes(extensionOf(file.name))
+    || file.type === 'image/x-adobe-dng'
+    || file.type === 'image/dng';
+}
 
 // Each photo is masked into a circle exactly once, at this multiple of its
 // tier's radius. 2.4 covers a retina phone at the scale the box is drawn and

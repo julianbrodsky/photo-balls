@@ -1,7 +1,8 @@
 // File validation, safe decoding, and the corner-trimming that turns a
 // rectangle into a ball. Photos never leave the browser: they are read
 // locally, re-rasterized onto canvases, and drawn straight to the board.
-import { UPLOAD, TEXTURE_SCALE } from './config.js';
+import { UPLOAD, TEXTURE_SCALE, extensionOf, isRaw } from './config.js';
+import { extractPreview } from './dng.js';
 
 // Working size for a decoded photo before it is cropped down to a tier. Big
 // enough that the largest ball stays sharp, small enough that ten of them do
@@ -16,14 +17,19 @@ export function validateSelection(files) {
     return [`This takes exactly ${UPLOAD.requiredCount} photos, and you picked ${files.length}.`];
   }
   const problems = [];
-  const maxMB = Math.round(UPLOAD.maxFileBytes / 1024 / 1024);
   for (const file of files) {
-    if (!UPLOAD.acceptedTypes.includes(file.type)) {
-      problems.push(`“${file.name}” is not a type we can read (JPEG, PNG, WebP or HEIC).`);
+    // Either credential will do. A .dng often arrives with no type at all, and
+    // a photo saved without an extension still has one.
+    const known = UPLOAD.acceptedTypes.includes(file.type)
+      || UPLOAD.acceptedExtensions.includes(extensionOf(file.name));
+    const cap = isRaw(file) ? UPLOAD.maxRawBytes : UPLOAD.maxFileBytes;
+
+    if (!known) {
+      problems.push(`“${file.name}” is not a type we can read (JPEG, PNG, WebP, HEIC or DNG).`);
     } else if (file.size === 0) {
       problems.push(`“${file.name}” is empty.`);
-    } else if (file.size > UPLOAD.maxFileBytes) {
-      problems.push(`“${file.name}” is bigger than ${maxMB} MB.`);
+    } else if (file.size > cap) {
+      problems.push(`“${file.name}” is bigger than ${Math.round(cap / 1024 / 1024)} MB.`);
     }
   }
   return problems;
@@ -51,12 +57,28 @@ export async function decodePhotos(files, onProgress) {
 // Decoding doubles as content verification: a file that claims to be a JPEG
 // but is not really an image fails right here.
 async function decodeOne(file) {
+  const raw = isRaw(file);
+  const source = raw ? await rawSource(file) : file;
   try {
     return typeof createImageBitmap === 'function'
-      ? await viaBitmap(file)
-      : await viaElement(file);
+      ? await viaBitmap(source)
+      : await viaElement(source);
   } catch {
-    throw new Error(`“${file.name}” could not be read as an image.`);
+    throw new Error(raw
+      ? `“${file.name}” is a raw file with no preview inside it we could read.`
+      : `“${file.name}” could not be read as an image.`);
+  }
+}
+
+// No browser decodes raw sensor data, so what gets decoded is the finished
+// JPEG preview the camera wrote into the same file. If there is no usable one,
+// the original is handed back regardless: that costs nothing and leaves the
+// door open for a browser that does know the format.
+async function rawSource(file) {
+  try {
+    return await extractPreview(file) ?? file;
+  } catch {
+    return file;
   }
 }
 
