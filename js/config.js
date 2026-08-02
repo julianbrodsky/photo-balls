@@ -107,6 +107,11 @@ export const PHYSICS = {
 
 // ── Round rules ────────────────────────────────────────────────────────────
 export const RULES = {
+  // How far up the ladder the ball waiting to be dropped can be. Handing out
+  // one of the three smallest at random rather than always the Pebble means a
+  // pile you were about to clear can be answered with the wrong size, and it
+  // gives you something to plan around instead of a single repeated move.
+  dropTiers: 3,
   dropCooldown: 0.3,      // seconds between drops, so a held tap cannot spray
   aimEase: 24,            // how quickly the ready ball slides to your finger
   spawnJitter: 1.5,       // board units of random x, to break perfect towers

@@ -7,8 +7,18 @@ import { TIERS, TOP_TIER, POP_VALUE, BOARD, RULES, floorYAt } from './config.js'
 // How long a freshly merged ball keeps its little swell of pride.
 export const POP_TIME = 0.3;
 
-const DROP_TIER = 0;
-const AIM_LIMIT = BOARD.halfWidth - TIERS[DROP_TIER].radius;
+// How far from the centre line a ball of this tier can sit and still be inside
+// the box. It depends on the ball, which is why the ready ball's reach changes
+// with whatever size you have been handed.
+function aimLimit(tier) {
+  return BOARD.halfWidth - TIERS[tier].radius;
+}
+
+function rollTier() {
+  return Math.floor(Math.random() * RULES.dropTiers);
+}
+
+const clamp = (x, limit) => Math.max(-limit, Math.min(limit, x));
 
 export function createGame({ onMerge, onDrop, onGameOver }) {
   const world = createWorld();
@@ -19,7 +29,7 @@ export function createGame({ onMerge, onDrop, onGameOver }) {
     score: 0,
     biggest: 0,            // highest tier index reached this round
     danger: 0,             // 0 to 1, how close the top line is to ending it
-    ready: { x: 0, y: BOARD.spawnY, tier: DROP_TIER },
+    ready: { x: 0, y: BOARD.spawnY, tier: rollTier() },
     canDrop: true,
     aim, nudge, drop, update, restart,
   };
@@ -28,11 +38,12 @@ export function createGame({ onMerge, onDrop, onGameOver }) {
   let cooldown = 0;
   let dangerTime = 0;
 
-  // The ready ball chases your finger instead of teleporting to it, which
-  // costs nothing and makes a fast drag across the top read as a real object
-  // being carried rather than a cursor being repainted.
+  // Where you asked for the ball to be, kept apart from where the ball is
+  // allowed to be. The two differ whenever the next ball is wider than the last
+  // one, and storing the raw wish means aiming at the wall then being handed a
+  // Gumball puts it against the wall rather than somewhere you did not point.
   function aim(x) {
-    aimX = Math.max(-AIM_LIMIT, Math.min(AIM_LIMIT, x));
+    aimX = clamp(x, aimLimit(0));
   }
 
   // Arrow keys move the aim from where it already is, not from where the ready
@@ -43,15 +54,19 @@ export function createGame({ onMerge, onDrop, onGameOver }) {
 
   function drop() {
     if (game.state !== 'playing' || cooldown > 0) return false;
+    const tier = game.ready.tier;
     const jitter = (Math.random() * 2 - 1) * RULES.spawnJitter;
     world.add({
-      x: Math.max(-AIM_LIMIT, Math.min(AIM_LIMIT, game.ready.x + jitter)),
+      x: clamp(game.ready.x + jitter, aimLimit(tier)),
       y: BOARD.spawnY,
-      radius: TIERS[DROP_TIER].radius,
-      tier: DROP_TIER,
+      radius: TIERS[tier].radius,
+      tier,
     });
     cooldown = RULES.dropCooldown;
     game.canDrop = false;
+    // The next size is decided the moment this one leaves your hand, so it is
+    // on screen for the whole cooldown rather than appearing at the end of it.
+    game.ready.tier = rollTier();
     onDrop?.();
     return true;
   }
@@ -60,7 +75,11 @@ export function createGame({ onMerge, onDrop, onGameOver }) {
     if (game.state === 'playing') {
       cooldown = Math.max(0, cooldown - dt);
       game.canDrop = cooldown === 0;
-      game.ready.x += (aimX - game.ready.x) * Math.min(1, RULES.aimEase * dt);
+      // Clamped here rather than in aim(), because the ball you are holding can
+      // change size between one frame and the next and a wider one has to come
+      // away from the wall to fit.
+      const target = clamp(aimX, aimLimit(game.ready.tier));
+      game.ready.x += (target - game.ready.x) * Math.min(1, RULES.aimEase * dt);
     }
 
     world.step(dt);
@@ -158,6 +177,7 @@ export function createGame({ onMerge, onDrop, onGameOver }) {
     game.biggest = 0;
     game.danger = 0;
     game.ready.x = 0;
+    game.ready.tier = rollTier();
     game.canDrop = true;
     aimX = 0;
     cooldown = 0;

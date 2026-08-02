@@ -154,7 +154,7 @@ export function createRenderer(canvas, textures) {
     ctx.lineWidth = 2;
     ctx.strokeStyle = 'rgba(255, 243, 226, 0.18)';
     ctx.beginPath();
-    ctx.moveTo(game.ready.x, BOARD.spawnY + TIERS[0].radius + 8);
+    ctx.moveTo(game.ready.x, BOARD.spawnY + TIERS[game.ready.tier].radius + 8);
     ctx.lineTo(game.ready.x, floorYAt(game.ready.x));
     ctx.stroke();
     ctx.restore();
