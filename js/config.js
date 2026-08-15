@@ -157,6 +157,30 @@ export function isRaw(file) {
 // still keeps the biggest texture under 400 pixels square.
 export const TEXTURE_SCALE = 2.4;
 
+// ── The funnel ─────────────────────────────────────────────────────────────
+// A chute mounted above the box's top right corner. The ball you will be
+// handed after this one sits in its mouth, so the next size is always visible,
+// and when the current ball leaves your hand that one rolls down the chute and
+// into the drop position. The delivery takes exactly one drop cooldown, which
+// turns the wait between drops from a dead pause into something you watch.
+//
+// It sits above the rim rather than inside the box, because the widest ball
+// you can be dealt is 86 units across and the airspace over the line has
+// nowhere near that much room to spare.
+// The widest ball you can be dealt is 43 units, so the throat has to clear
+// that at both ends and the rails have to run a good way behind the waiting
+// ball, or it looks like it is falling out of the back of the pipe. The mouth
+// stays above the rim and inboard of the right wall, so the ball rolls out
+// over the open box rather than through the side of it.
+export const FUNNEL = {
+  entryX: 148, entryY: -111,  // where the next ball waits, and is drawn
+  exitX: 58, exitY: -78,      // where the chute lets go of it
+  entryHalf: 60,              // half the throat's width at the wide end
+  exitHalf: 54,               // ...and at the narrow end, so it reads as a funnel
+  overhang: 60,               // how far the rails run on past the waiting ball
+  railThickness: 11,
+};
+
 export const STORAGE_KEY = 'photo-balls:best';
 
 // Nothing is fetched from anywhere, so the type has to come from the device.

@@ -2,18 +2,51 @@
 // and the ball waiting to go in. Drawing happens in board units, so this file
 // and the physics agree on what a coordinate means and neither has to think
 // about pixels.
-import { BOARD, TIERS, TOP_TIER, floorYAt } from './config.js';
+import { BOARD, TIERS, TOP_TIER, FUNNEL, floorYAt } from './config.js';
 import { POP_TIME } from './board.js';
 
 const TAU = Math.PI * 2;
 
-// The drawn stage is the interior plus the shell around it, with a little air
-// above the open top so the ready ball is never clipped by the canvas edge.
+// Where the box's walls stop. Everything above this belongs to the funnel, and
+// pinning it here is what keeps extending the stage upward from stretching the
+// box along with it.
+const RIM_Y = -18;
+
+// The chute's four rail ends, worked out once from the funnel's centre line.
+// Doing it here rather than per frame is partly for speed and mostly so the
+// stage can be sized off the real shape: the top edge comes from the highest
+// rail there actually is, which means retuning the funnel in config can never
+// leave it clipped by the canvas.
+const CHUTE = (() => {
+  const { entryX, entryY, exitX, exitY, entryHalf, exitHalf, overhang } = FUNNEL;
+  const dx = exitX - entryX;
+  const dy = exitY - entryY;
+  const len = Math.hypot(dx, dy);
+  const ax = dx / len, ay = dy / len;      // along the chute
+  const nx = -ay, ny = ax;                 // across it
+
+  // The rails run on behind the waiting ball, so the chute reads as something
+  // the ball came out of rather than something it is perched on the end of.
+  const backX = entryX - ax * overhang;
+  const backY = entryY - ay * overhang;
+  const at = (x, y, half, side) => ({ x: x + nx * half * side, y: y + ny * half * side });
+
+  return {
+    upper: [at(backX, backY, entryHalf, 1), at(exitX, exitY, exitHalf, 1)],
+    lower: [at(backX, backY, entryHalf, -1), at(exitX, exitY, exitHalf, -1)],
+  };
+})();
+
+const CHUTE_TOP = Math.min(...[...CHUTE.upper, ...CHUTE.lower].map(p => p.y));
+
+// The drawn stage is the box, its shell, and the airspace above it that the
+// funnel hangs in.
 const SHELL = BOARD.wallThickness;
+
 export const STAGE = {
   left: -(BOARD.halfWidth + SHELL),
   right: BOARD.halfWidth + SHELL,
-  top: -18,
+  top: Math.min(RIM_Y, CHUTE_TOP - FUNNEL.railThickness),
   bottom: BOARD.floorY + SHELL + BOARD.rimThickness,
 };
 STAGE.width = STAGE.right - STAGE.left;
@@ -57,6 +90,7 @@ export function createRenderer(canvas, textures) {
     ctx.setTransform(s, 0, 0, s, view.originX * view.dpr, view.originY * view.dpr);
 
     drawBox();
+    if (game.state === 'playing') drawFunnel(game, time);
     drawLine(game.danger, time);
     if (game.state === 'playing') drawGuide(game);
     for (const body of game.world.bodies) {
@@ -64,6 +98,46 @@ export function createRenderer(canvas, textures) {
     }
     if (game.state === 'playing') drawReady(game, time);
     effects.draw(ctx);
+  }
+
+  // ── The funnel ───────────────────────────────────────────────────────────
+
+  // Two converging rails with a dark throat between them. The ball waiting its
+  // turn is drawn inside, before the rails go down, so the rails read as the
+  // near wall of a tube it is sitting in rather than a shape behind it.
+  function drawFunnel(game, time) {
+    const [upA, upB] = CHUTE.upper;
+    const [downA, downB] = CHUTE.lower;
+
+    ctx.beginPath();
+    ctx.moveTo(upA.x, upA.y);
+    ctx.lineTo(upB.x, upB.y);
+    ctx.lineTo(downB.x, downB.y);
+    ctx.lineTo(downA.x, downA.y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(18, 4, 44, 0.55)';
+    ctx.fill();
+
+    // The ball on deck. It swells into view over the delivery, so the moment
+    // one ball rolls out the next is visibly fed in behind it.
+    const arriving = 1 - Math.pow(game.delivery, 2);
+    if (arriving > 0.02) {
+      drawBall(FUNNEL.entryX, FUNNEL.entryY, game.next.tier, time * 0.4, arriving, 1);
+    }
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const [a, b] of [[upA, upB], [downA, downB]]) {
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = 'rgba(24, 6, 48, 0.55)';
+      ctx.lineWidth = FUNNEL.railThickness + 8;
+      ctx.stroke();
+      ctx.strokeStyle = '#fff3e2';
+      ctx.lineWidth = FUNNEL.railThickness;
+      ctx.stroke();
+    }
   }
 
   // ── The box ──────────────────────────────────────────────────────────────
@@ -74,13 +148,13 @@ export function createRenderer(canvas, textures) {
     // The wash starts level with the top of the walls, not above them, so the
     // box has a lip rather than fading out into the backdrop.
     ctx.beginPath();
-    ctx.moveTo(-hw, STAGE.top);
+    ctx.moveTo(-hw, RIM_Y);
     ctx.lineTo(-hw, FLOOR_EDGE_Y);
     ctx.quadraticCurveTo(0, FLOOR_CONTROL_Y, hw, FLOOR_EDGE_Y);
-    ctx.lineTo(hw, STAGE.top);
+    ctx.lineTo(hw, RIM_Y);
     ctx.closePath();
 
-    const wash = ctx.createLinearGradient(0, STAGE.top, 0, BOARD.floorY);
+    const wash = ctx.createLinearGradient(0, RIM_Y, 0, BOARD.floorY);
     wash.addColorStop(0, 'rgba(30, 8, 60, 0.16)');
     wash.addColorStop(1, 'rgba(18, 4, 44, 0.52)');
     ctx.fillStyle = wash;
@@ -90,10 +164,10 @@ export function createRenderer(canvas, textures) {
     // band you see stops exactly where the solver stops the balls.
     const off = SHELL / 2;
     ctx.beginPath();
-    ctx.moveTo(-hw - off, STAGE.top);
+    ctx.moveTo(-hw - off, RIM_Y);
     ctx.lineTo(-hw - off, FLOOR_EDGE_Y + off);
     ctx.quadraticCurveTo(0, FLOOR_CONTROL_Y + off, hw + off, FLOOR_EDGE_Y + off);
-    ctx.lineTo(hw + off, STAGE.top);
+    ctx.lineTo(hw + off, RIM_Y);
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -109,9 +183,9 @@ export function createRenderer(canvas, textures) {
     ctx.strokeStyle = 'rgba(255, 170, 210, 0.55)';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.moveTo(-hw - off + 4, STAGE.top + 10);
+    ctx.moveTo(-hw - off + 4, RIM_Y + 10);
     ctx.lineTo(-hw - off + 4, FLOOR_EDGE_Y - 20);
-    ctx.moveTo(hw + off - 4, STAGE.top + 10);
+    ctx.moveTo(hw + off - 4, RIM_Y + 10);
     ctx.lineTo(hw + off - 4, FLOOR_EDGE_Y - 20);
     ctx.stroke();
   }
@@ -160,12 +234,32 @@ export function createRenderer(canvas, textures) {
     ctx.restore();
   }
 
+  // Once settled, the ball waiting to be dropped just bobs. While it is being
+  // delivered it walks a curve from the funnel's hopper, bending around the
+  // chute's mouth, to wherever you are currently aiming. The destination is
+  // read fresh every frame, so dragging mid delivery steers the ball in.
   function drawReady(game, time) {
-    const bob = Math.sin(time * 3.4) * 2.5;
-    // The ball fades while the drop is on cooldown, which is the only cue that
-    // the next tap is not going to do anything yet.
-    const alpha = game.canDrop ? 1 : 0.45;
-    drawBall(game.ready.x, BOARD.spawnY + bob, game.ready.tier, time * 0.6, 1, alpha);
+    if (game.delivery <= 0) {
+      const bob = Math.sin(time * 3.4) * 2.5;
+      drawBall(game.ready.x, BOARD.spawnY + bob, game.ready.tier, time * 0.6, 1, 1);
+      return;
+    }
+
+    const p = easeInOut(1 - game.delivery);
+    const q = 1 - p;
+    // A quadratic Bezier with the chute's mouth as its control point: the ball
+    // leaves along the chute and swings out of it, rather than cutting the
+    // corner through the rail.
+    const x = q * q * FUNNEL.entryX + 2 * q * p * FUNNEL.exitX + p * p * game.ready.x;
+    const y = q * q * FUNNEL.entryY + 2 * q * p * FUNNEL.exitY + p * p * BOARD.spawnY;
+
+    // Turning through five radians on the way down sells it as rolling rather
+    // than sliding.
+    drawBall(x, y, game.ready.tier, time * 0.6 + p * 5, 1, 1);
+  }
+
+  function easeInOut(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
   // ── Balls ────────────────────────────────────────────────────────────────

@@ -30,6 +30,14 @@ export function createGame({ onMerge, onDrop, onGameOver }) {
     biggest: 0,            // highest tier index reached this round
     danger: 0,             // 0 to 1, how close the top line is to ending it
     ready: { x: 0, y: BOARD.spawnY, tier: rollTier() },
+    // The one after that, sitting in the funnel where you can see it coming.
+    next: { tier: rollTier() },
+    // 1 the instant a ball leaves the funnel, 0 once it has arrived. It is the
+    // cooldown expressed as a fraction rather than a clock of its own, so the
+    // ball cannot appear to land a frame before or after the drop unlocks.
+    // The renderer reads it to walk the ball down the chute; nothing about the
+    // simulation depends on it.
+    delivery: 0,
     canDrop: true,
     aim, nudge, drop, update, restart,
   };
@@ -64,9 +72,14 @@ export function createGame({ onMerge, onDrop, onGameOver }) {
     });
     cooldown = RULES.dropCooldown;
     game.canDrop = false;
-    // The next size is decided the moment this one leaves your hand, so it is
-    // on screen for the whole cooldown rather than appearing at the end of it.
-    game.ready.tier = rollTier();
+
+    // The queue shuffles along: what was in the funnel becomes what you are
+    // holding, and a fresh roll takes its place. Because the funnel showed it
+    // the whole time, the size you get now is one you already knew about.
+    game.ready.tier = game.next.tier;
+    game.next.tier = rollTier();
+    game.delivery = 1;
+
     onDrop?.();
     return true;
   }
@@ -75,6 +88,7 @@ export function createGame({ onMerge, onDrop, onGameOver }) {
     if (game.state === 'playing') {
       cooldown = Math.max(0, cooldown - dt);
       game.canDrop = cooldown === 0;
+      game.delivery = cooldown / RULES.dropCooldown;
       // Clamped here rather than in aim(), because the ball you are holding can
       // change size between one frame and the next and a wider one has to come
       // away from the wall to fit.
@@ -178,6 +192,8 @@ export function createGame({ onMerge, onDrop, onGameOver }) {
     game.danger = 0;
     game.ready.x = 0;
     game.ready.tier = rollTier();
+    game.next.tier = rollTier();
+    game.delivery = 0;
     game.canDrop = true;
     aimX = 0;
     cooldown = 0;
